@@ -1,0 +1,185 @@
+---
+title: "Finger Exercises - Finger 1"
+output: html_notebook
+---
+
+Paquetes que vamos a usar
+
+```{r packages, message=FALSE, warning=FALSE}
+library(lubridate)
+library(forcats)
+library(stringr)
+library(tidyverse)
+library(plotly)
+library(magrittr)
+```
+
+Carga de datos
+
+
+### **1.a** ¿Cuántas estaciones hay en total?
+```{r}
+# Estaciones distintas reportadas por el dataset station
+station %$%
+  n_distinct(id)
+
+# Estaciones distintas como puntos de partida
+trip %$%
+  n_distinct(start_station_id)
+
+# Estaciones distintas como puntos de llegada
+trip %$%
+  n_distinct(end_station_id)
+```
+
+### **1.b** ¿Cuántas bicicletas hay disponibles para alquilar?
+```{r}
+trip %$%
+  n_distinct(bike_id)
+```
+
+### **2.a** ¿Cuál es la cantidad máxima de bicicletas que han estado en funcionamiento al mismo tiempo?
+```{r}
+trip_02 <- trip %>%
+  gather(
+    key = event,
+    value = station_id,
+    matches("station_id")
+  ) %>%
+  mutate(
+    event = event %>% str_extract("[a-z]+") %>% as_factor,
+    time = if_else(event == "start", start_date, end_date)
+  ) %>%
+  select(-start_date, -end_date) %>%
+  arrange(time, event, id) %T>%
+  print
+```
+
+```{r}
+trip_03 <- trip_02 %>%
+  inner_join(
+    station_02 %>%
+      select(
+        id,
+        station_zip_code = zip_code
+      ),
+    by = c('station_id' = 'id')
+  ) %T>%
+  print
+```
+
+```{r}
+trip_04 <- trip_03 %>%
+  group_by(
+    time,
+    station_zip_code
+  ) %>%
+  summarise(
+    balance_by_minute_city = sum(if_else(event == 'start', 1, -1))
+  ) %T>%
+  print
+```
+
+```{r}
+trip_05 <- trip_04 %>%
+  arrange(time) %>%
+  group_by(time) %>%
+  summarise_at(
+    "balance_by_minute_city", sum
+  ) %>%
+  mutate(
+    bikes_running = cumsum(balance_by_minute_city)
+  ) %T>%
+  print
+```
+
+```{r}
+trip_05 %>%
+  filter(balance_by_minute_city != 0) %>%
+  group_by(date = time %>% floor_date(unit = "day")) %>%
+  summarise(
+    bikes_running = max(bikes_running)
+  ) %>%
+  plot_ly(
+    x = ~date
+  ) %>%
+  add_lines(
+    y = ~bikes_running
+  )
+```
+
+### **2.b** ¿En qué día y condiciones climáticas se dio el máximo?
+```{r}
+trip_02 %>%
+  filter(bikes_running == max(bikes_running)) 
+```
+
+```{r}
+trip_02 %>%
+  group_by(time) %>%
+  summarise(
+    balance_minuto = 2 * sum(event == 'start') - n()
+  ) %>%
+  ungroup %>%
+  mutate(
+    bikes_running = cumsum(balance_minuto)
+  ) %>%
+  filter(bikes_running == max(bikes_running))
+```
+
+```{r}
+trip_02 %>%
+  group_by(date = as.Date(time) %>% ymd) %>%
+  summarise(n = n())
+```
+```{r}
+trip %>%
+  filter(
+    start_station_id != end_station_id,
+    subscription_type == 'Subscriber'
+  ) %>%
+  # group_by(
+  #   start_date,
+  #   end_date,
+  #   start_station_id,
+  #   end_station_id
+  # ) %>%
+  # summarise(
+  #   n = n(),
+  #   zip_codes = list(zip_code)
+  # ) %>%
+  # arrange(-n)
+  count(
+    start_date,
+    end_date,
+    start_station_id,
+    end_station_id
+  ) %>%
+  ungroup %>%
+  filter(n > 1) %>%
+  count(start_station_id, end_station_id, sort = TRUE)
+```
+
+```{r}
+trip %>% distinct(subscription_type)
+```
+
+```{r}
+weather %>%
+  distinct(events) %>%
+  mutate(
+    rain = str_detect(events, regex("rain", ignore_case = TRUE)),
+    fog = str_detect(events, regex("fog", ignore_case = TRUE)),
+    thunderstorm = str_detect(events, regex("thunderstorm", ignore_case = TRUE))
+  )
+```
+
+```{r}
+weather %>%
+  #filter(!str_detect(events, regex("rain", ignore_case = TRUE)), as.numeric(precipitation_inches) > 0)
+  filter(date == '10/23/2014')
+```
+
+### **3** Idem anterior pero para el mínimo de bicicletas.
+
+### **4** Visualización de la cantidad total de bicicletas alquiladas por día y hora.

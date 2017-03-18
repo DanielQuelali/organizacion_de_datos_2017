@@ -1,0 +1,178 @@
+---
+title: "San Francisco Biking"
+output: html_notebook
+---
+
+## Exploración inicial de los datasets
+
+```{r packages, message=FALSE, warning=FALSE}
+library(lubridate)
+library(tidyverse)
+library(forcats)
+library(plotly)
+library(stringr)
+```
+
+```{r}
+library(fst)
+
+status <- fst::read.fst("../data/raw/status.fst")
+
+status_station_2 <- status %>%
+  filter(station_id == 2) %>%
+  mutate(
+    docks_count = bikes_available + docks_available,
+    time = time %>% ymd_hms
+  ) %>%
+  arrange(station_id, time)
+
+rm(status)
+gc(TRUE)
+```
+
+### Importamos los datos
+
+```{r trip}
+trip <- read_csv(
+    "../data/raw/trip.csv",
+    col_types = cols_only(
+      id = col_integer(),
+      duration = col_integer(),
+      start_date = col_datetime(format = "%m/%d/%Y %H:%M"),
+      # start_station_name = col_character(),
+      start_station_id = col_integer(),
+      end_date = col_datetime(format = "%m/%d/%Y %H:%M"),
+      # end_station_name = col_character(),
+      end_station_id = col_integer(),
+      bike_id = col_integer(),
+      subscription_type = col_factor(levels = c("Subscriber", "Customer")),
+      zip_code = col_character()
+    )
+  )
+```
+
+```{r station}
+station <- read_csv(
+    "../data/raw/station.csv",
+    col_types = cols(
+      installation_date = col_date(format = "%m/%d/%Y")
+    )
+  )
+```
+
+```{r weather}
+weather <- read_csv(
+    "../data/raw/weather.csv",
+    col_types = cols(
+      date = col_date(format = "%m/%d/%Y")
+    )
+  )
+```
+
+###Inspeccionamos
+La función `glimpse` imprime una versión preliminar del dataset,
+incluyendo cantidad de observaciones (filas) y variables (columnas) y
+el tipo de cada variable.  
+  
+Es parecida a `str`, pero más prolija.
+
+```{r}
+glimpse(trip)
+```
+
+```{r}
+glimpse(station)
+```
+
+```{r}
+glimpse(weather)
+```
+
+```{r}
+station_02 <- station %>%
+  mutate(
+    zip_code = city %>% recode(
+      'San Jose' = 95113L,
+      'Mountain View' = 94041L,
+      'Palo Alto' = 94301L,
+      'Redwood City' = 94063L,
+      'San Francisco' = 94107L
+    )
+  ) %>%
+  mutate_at(
+    vars(name, city),
+    as.factor
+  ) %>%
+  glimpse()
+```
+
+```{r trip_events}
+trip_events <- trip %>%
+  gather(
+    key = event,
+    value = station_id,
+    matches("station_id")
+  ) %>%
+  mutate(
+    event = event %>% str_extract("[a-z]+") %>% fct_inorder(),
+    time = if_else(event == "start", start_date, end_date)
+  ) %>%
+  select(-start_date, -end_date) %>%
+  arrange(time, desc(event), id) %>%
+  mutate(
+    bikes_running = cumsum(event == "start") - cumsum(event == "end")
+  ) %>%
+  inner_join(
+    station_02 %>%
+      select(
+        id,
+        station_zip_code = zip_code
+      ),
+    by = c('station_id' = 'id')
+  ) %>%
+  glimpse()
+```
+
+```{r}
+weather_02 <- weather %>%
+  mutate(
+    rain = str_detect(events, regex("rain", ignore_case = TRUE)) %>% coalesce(FALSE),
+    fog = str_detect(events, regex("fog", ignore_case = TRUE)) %>% coalesce(FALSE),
+    thunderstorm = str_detect(events, regex("thunderstorm", ignore_case = TRUE)) %>% coalesce(FALSE)
+  ) %>%
+  select(-events) %>%
+  glimpse()
+```
+
+```{r}
+trip_events %>%
+  mutate(
+    date = as.Date(time)
+  )
+```
+
+```{r, warning=FALSE}
+library(seriation)
+
+trip %>%
+  left_join(station %>% select(id, city), by = c("start_station_id" = "id")) %>%
+  mutate_at("zip_code", as.numeric) %>%
+  semi_join(weather, by = "zip_code") %$%
+  table(zip_code, city) %>%
+  matrix(
+    nrow = nrow(.),
+    dimnames = list(
+      rownames(.),
+      colnames(.)
+    )
+  ) %>%
+  scale(center = FALSE) %>%
+  permute(seriate(., method = "BEA")) %>%
+  plot_ly(
+    x = colnames(.) %>% fct_inorder,
+    y = rownames(.) %>% fct_inorder,
+    z = .,
+    type = "heatmap"
+  )
+```
+

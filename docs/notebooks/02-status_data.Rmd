@@ -1,0 +1,117 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+Lo primero que me llama la atención es el tamaño del dataframe `status`.  
+Navegando por los primeros registros de esta tabla, observamos que el status de cada _station_ se actualiza cada minuto, sin importar si hubo cambios o no en la cantidad de bicicletas disponibles.
+
+```{r, echo=FALSE}
+status
+```
+
+Una forma más eficiente de guardar la misma información sería registrar eventos para los cambios de estado.  
+
+
+```{r}
+status %>%
+  mutate(
+    dock_count_status = bikes_available + docks_available
+  ) %>%
+  count(station_id, dock_count_status) %>%
+  left_join(station %>% select(id, dock_count), by = c("station_id" = "id")) %>%
+  group_by(station_id) %>%
+  plot_ly(
+    x = ~dock_count_status
+  ) %>%
+  add_bars(
+    y = ~n,
+    text = ~paste("station_id =", station_id),
+    color = ~dock_count_status == dock_count,
+    colors = c("#132B43", "#56B1F7"),
+    alpha = 0.5
+  )
+```
+
+
+```{r}
+status_station_2 %>%
+  mutate(
+    dock_count_status = bikes_available + docks_available
+  ) %>%
+  count(station_id, dock_count_status) %>%
+  left_join(station %>% select(id, dock_count), by = c("station_id" = "id")) %>%
+  group_by(station_id) %>%
+  plot_ly(
+    x = ~dock_count_status
+  ) %>%
+  add_bars(
+    y = ~n,
+    text = ~paste("station_id =", station_id),
+    color = ~dock_count_status == dock_count,
+    colors = c("#132B43", "#56B1F7"),
+    alpha = 0.5
+  )
+```
+
+```{r}
+station_times <- status_station_2 %>%
+  group_by(station_id) %>%
+  summarise(
+    min_time = min(time),
+    max_time = max(time)
+  ) %>%
+  inner_join(
+    station %>% select(id, installation_date),
+    by = c("station_id" = "id")
+  ) %>%
+  mutate_at(
+    c("min_time", "max_time"),
+    ymd_hms
+  ) %>%
+  mutate_at("installation_date", mdy)
+
+station_times
+```
+
+```{r}
+station_times %>%
+  filter(min_time < installation_date)
+```
+
+
+Como ejercicio de control de calidad de datos,
+primero vamos a checkear que algunas suposiciones se cumplan.  
+
+Estas son:
+
+* hay un registro por minuto para cada _station_id_
+* la suma de _bikes_available_ y _docks_available_ tiene que ser igual a lo reportado por la tabla __station__ en el campo _dock_count_
+* la fecha del registro no es menor a la fecha de instalación reportada por __station__
+
+```{r}
+status_station_2 %>%
+  #group_by(station_id) %>%
+  # mutate(secs_since_last_update = as.numeric(time - lag(time), "secs")) %>%
+  # group_by(secs_since_last_update) %>%
+  # mutate(freq_secs_update = n()) %>%
+  # ungroup %>%
+  # filter(freq_secs_update < 10 | lead(freq_secs_update) < 10)
+  filter((bikes_available != lag(bikes_available)) %>% coalesce(TRUE)) %>%
+  plot_ly(
+    x = ~time
+  ) %>%
+  add_lines(
+    y = ~bikes_available,
+    line = list(
+      shape = 'hv'
+    ),
+    alpha = 0.2
+  )
+```
+
+```{r}
+status2 <- status %>%
+  arrange(station_id, time)
+```
