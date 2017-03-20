@@ -1,6 +1,8 @@
 ---
 title: "San Francisco Biking"
 output: html_notebook
+editor_options: 
+  chunk_output_type: inline
 ---
 
 ## Exploración inicial de los datasets
@@ -11,6 +13,10 @@ library(tidyverse)
 library(forcats)
 library(plotly)
 library(stringr)
+```
+
+```{r}
+# getwd() %>% normalizePath() %>% list(PROJ_HOME = .) %>% attach
 ```
 
 ```{r}
@@ -33,8 +39,8 @@ gc(TRUE)
 ### Importamos los datos
 
 ```{r trip}
-trip <- read_csv(
-    "../data/raw/trip.csv",
+trip <- file.path(PROJ_HOME, "data/raw", "trip.csv") %>%
+  read_csv(
     col_types = cols_only(
       id = col_integer(),
       duration = col_integer(),
@@ -52,8 +58,8 @@ trip <- read_csv(
 ```
 
 ```{r station}
-station <- read_csv(
-    "../data/raw/station.csv",
+station <- file.path(PROJ_HOME, "data/raw", "station.csv") %>%
+  read_csv(
     col_types = cols(
       installation_date = col_date(format = "%m/%d/%Y")
     )
@@ -61,8 +67,8 @@ station <- read_csv(
 ```
 
 ```{r weather}
-weather <- read_csv(
-    "../data/raw/weather.csv",
+weather <- file.path(PROJ_HOME, "data/raw", "weather.csv") %>%
+  read_csv(
     col_types = cols(
       date = col_date(format = "%m/%d/%Y")
     )
@@ -145,9 +151,28 @@ weather_02 <- weather %>%
 ```
 
 ```{r}
-trip_events %>%
+meses <- locale("es")[[c("date_names", "mon")]] %>% str_to_title()
+dias <- locale("es")[[c("date_names", "day")]] %>% str_to_title()
+
+trip_events_02 <- trip_events %>%
   mutate(
-    date = as.Date(time)
+    date = time %>% as.Date(),
+    month = time %>%
+      month() %>%
+      factor(levels = 1:12, labels = meses),
+    month_day = time %>% format("%d de %B") %>% factor,
+    day_of_week = time %>%
+      wday() %>%
+      factor(levels = 1:7, labels = dias) %>%
+      # Reordeno para que quede el Lunes primero
+      fct_shift(1),
+    is_weekend = day_of_week %in% c("Sábado", "Domingo"),
+    hour = time %>% hour(),
+    hm = time %>% format("%H:%M") %>% factor,
+    week_id = cumsum(day_of_week == "Lunes" & coalesce(day_of_week != lag(day_of_week), FALSE))
+  ) %T>%
+  saveRDS(
+    file.path(PROJ_HOME, "data/processed", "trip_events_02.Rds")
   )
 ```
 
@@ -173,6 +198,13 @@ trip %>%
     y = rownames(.) %>% fct_inorder,
     z = .,
     type = "heatmap"
+  )
+```
+
+```{r}
+trip_events_02 %>%
+  saveRDS(
+    file.path(PROJ_HOME, "data/processed", "trip_events_02.Rds")
   )
 ```
 

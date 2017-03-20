@@ -1,6 +1,8 @@
 ---
 title: "Finger Exercises - Finger 1"
 output: html_notebook
+editor_options: 
+  chunk_output_type: inline
 ---
 
 Paquetes que vamos a usar
@@ -183,3 +185,9 @@ weather %>%
 ### **3** Idem anterior pero para el mínimo de bicicletas.
 
 ### **4** Visualización de la cantidad total de bicicletas alquiladas por día y hora.
+```{r}
+trip_events_02 %>%
+  plot_ly(
+    x = day_of_week
+  )
+```

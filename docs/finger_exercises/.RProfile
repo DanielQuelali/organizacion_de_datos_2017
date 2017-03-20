@@ -1,0 +1,4 @@
+# Couldn't find a workaround this for R Markdown
+attach(
+  list(PROJ_HOME = normalizePath("../.."))
+)

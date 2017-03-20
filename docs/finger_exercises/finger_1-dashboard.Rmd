@@ -1,0 +1,261 @@
+---
+title: "Comportamiento, a través del tiempo, de los clientes de una empresa de alquiler de bicicletas."
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: fill
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(lubridate)
+library(tidyverse)
+library(forcats)
+library(plotly)
+library(stringr)
+```
+
+```{r}
+trip_events_02 <- file.path(PROJ_HOME, "data/processed", "trip_events_02.Rds") %>%
+  readRDS()
+```
+
+Column {data-height=300}
+-----------------------------------------------------------------------
+
+### Promedio de viajes diarios. <span style ="color:#0571b0; font-weight:bold;">Subscriptores anuales</span>
+
+```{r, fig.width=3}
+trip_events_02 %>%
+  filter(event == 'start', subscription_type == 'Subscriber') %>%
+  #head(100000) %>%
+  count(date, week_id, day_of_week) %>%
+  group_by(week_id) %>%
+  plot_ly(
+    x = ~day_of_week,
+    color = ~I('#0571b0')
+  ) %>%
+  add_lines(
+    y = ~n,
+    alpha = 0.05
+  ) %>%
+  group_by(day_of_week) %>%
+  summarise(
+    mean_rides_by_day = mean(n)
+  ) %>%
+  add_lines(
+    y = ~mean_rides_by_day,
+    name = 'Viajes Prom.'
+  ) %>%
+  layout(
+    xaxis = list(
+      title = NA
+    ),
+    yaxis = list(
+      title = NA,
+      rangemode = 'tozero'
+    ),
+    showlegend = FALSE,
+    margin = list(
+      r = 30
+    )
+  )
+```
+
+### Viajes, minuto a minuto
+
+```{r}
+trip_events_02 %>%
+  filter(event == 'start', subscription_type == 'Subscriber') %>%
+  #head(100000) %>%
+  count(is_weekend, hm) %>%
+  plot_ly(
+    x = ~hm
+  ) %>%
+  add_lines(
+    y = ~n,
+    color = ~is_weekend %>%
+      factor %>%
+      fct_recode(
+        'Fines de semana' = 'TRUE',
+        'Lu. a Vi.' = 'FALSE'
+      ),
+    colors = c('#0571b0', '#92c5de')
+  ) %>%
+  layout(
+    xaxis = list(
+      title = NA,
+      gridwidth = 2,
+      #tickangle = -70,
+      dtick = 180
+    ),
+    yaxis = list(
+      title = NA,
+      showgrid = FALSE,
+      rangemode = 'tozero'
+    ),
+    legend = list(
+      x = 0,
+      y = 1
+    )
+  )
+```
+
+Column {data-height=300}
+-----------------------------------------------------------------------
+
+### Promedio de viajes diarios. <span style ="color:#e66101; font-weight:bold;">Clientes casuales</span> (miembros por 24 ó 72hs)
+
+```{r, fig.width=3}
+trip_events_02 %>%
+  filter(event == 'start', subscription_type == 'Customer') %>%
+  #head(100000) %>%
+  count(date, week_id, day_of_week) %>%
+  group_by(week_id) %>%
+  plot_ly(
+    x = ~day_of_week,
+    color = ~I('#e66101')
+  ) %>%
+  add_lines(
+    y = ~n,
+    alpha = 0.05
+  ) %>%
+  group_by(day_of_week) %>%
+  summarise(
+    mean_rides_by_day = mean(n)
+  ) %>%
+  add_lines(
+    y = ~mean_rides_by_day,
+    name = 'Viajes Prom.'
+  ) %>%
+  layout(
+    xaxis = list(
+      title = NA #,rangeslider = list(type = 'date')
+    ),
+    yaxis = list(
+      title = NA,
+      rangemode = 'tozero'
+    ),
+    showlegend = FALSE,
+    margin = list(
+      r = 30
+    )
+  )
+```
+
+### Viajes, minuto a minuto
+
+```{r}
+trip_events_02 %>%
+  filter(event == 'start', subscription_type == 'Customer') %>%
+  #head(100000) %>%
+  count(is_weekend, hm) %>%
+  plot_ly(
+    x = ~hm
+  ) %>%
+  add_lines(
+    y = ~n,
+    color = ~is_weekend %>%
+      factor %>%
+      fct_recode(
+        'Fines de semana' = 'TRUE',
+        'Lu. a Vi.' = 'FALSE'
+      ),
+    colors = c('#e66101', '#fdb863'),
+    alpha = 0.8
+  ) %>%
+  layout(
+    xaxis = list(
+      title = NA,
+      gridwidth = 2,
+      #tickangle = -70,
+      dtick = 180
+    ),
+    yaxis = list(
+      title = NA,
+      showgrid = FALSE,
+      rangemode = 'tozero'
+    ),
+    legend = list(
+      x = 0,
+      y = 1
+    )
+  )
+```
+
+Column {data-height=500}
+-----------------------------------------------------------------------
+
+### Histórico de cantidad de viajes por día
+
+*Nota: La fecha del pico histórico tiene en cuenta la suma de ambos tipos de subscripción.*
+
+```{r}
+trip_events_02 %>%
+  filter(event == 'start') %>%
+  #head(100000) %>%
+  count(subscription_type, date) %>%
+  ungroup %>%
+  plot_ly(
+    x = ~date
+  ) %>%
+  add_lines(
+    y = ~n,
+    color = ~subscription_type %>%
+      fct_recode(
+        'Subscriptores anuales' = 'Subscriber',
+        'Clientes casuales' = 'Customer'
+      ),
+    colors = c('#0571b0', '#e66101')
+  ) %>%
+  add_fun(function(plot) {
+    plot %>%
+      group_by(date) %>%
+      summarise(n_subs = max(n), n = sum(n)) %>%
+      filter(n == max(n)) %>%
+      add_annotations(
+        text = ~str_c("Pico Histórico: ", date),
+        y = ~n_subs
+      )
+  }) %>%
+  layout(
+    xaxis = list(
+      title = NA,
+      # rangeselector = list(
+      #   buttons = list(
+      #     list(
+      #       count = 3,
+      #       label = "3 mo",
+      #       step = "month",
+      #       stepmode = "backward"),
+      #     list(
+      #       count = 6,
+      #       label = "6 mo",
+      #       step = "month",
+      #       stepmode = "backward"),
+      #     list(
+      #       count = 1,
+      #       label = "1 yr",
+      #       step = "year",
+      #       stepmode = "backward"),
+      #     list(
+      #       count = 1,
+      #       label = "YTD",
+      #       step = "year",
+      #       stepmode = "todate"),
+      #     list(step = "all"))),
+      rangeslider = list(type = 'date')
+    ),
+    yaxis = list(
+      title = NA,
+      rangemode = 'tozero'
+    ),
+    legend = list(
+      x = 0,
+      y = 1
+    ),
+    margin = list(
+      u = 0
+    )
+  )
+```
