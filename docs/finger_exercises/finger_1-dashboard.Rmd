@@ -238,7 +238,7 @@ trip_events_02 %>%
             label = "1 año",
             step = "year",
             stepmode = "backward"),
-          list(step = "Todo"))),
+          list(step = "all"))),
       rangeslider = list(type = 'date')
     ),
     yaxis = list(
