@@ -188,25 +188,25 @@ Column {data-height=500}
 
 ### Histórico de cantidad de viajes por día
 
-*Nota: La fecha del pico histórico tiene en cuenta la suma de ambos tipos de subscripción.*
-
 ```{r}
 trip_events_02 %>%
   filter(event == 'start') %>%
   #head(100000) %>%
-  count(subscription_type, date) %>%
+  count(subscription_type, date, day_of_week) %>%
   ungroup %>%
   plot_ly(
     x = ~date
   ) %>%
-  add_lines(
+  add_bars(
     y = ~n,
     color = ~subscription_type %>%
       fct_recode(
         'Subscriptores anuales' = 'Subscriber',
         'Clientes casuales' = 'Customer'
-      ),
-    colors = c('#0571b0', '#e66101')
+      ) %>%
+      fct_rev(),
+    colors = c('#e66101', '#0571b0'),
+    text = ~day_of_week
   ) %>%
   add_fun(function(plot) {
     plot %>%
@@ -215,35 +215,30 @@ trip_events_02 %>%
       filter(n == max(n)) %>%
       add_annotations(
         text = ~str_c("Pico Histórico: ", date),
-        y = ~n_subs
+        y = ~n
       )
   }) %>%
   layout(
     xaxis = list(
       title = NA,
-      # rangeselector = list(
-      #   buttons = list(
-      #     list(
-      #       count = 3,
-      #       label = "3 mo",
-      #       step = "month",
-      #       stepmode = "backward"),
-      #     list(
-      #       count = 6,
-      #       label = "6 mo",
-      #       step = "month",
-      #       stepmode = "backward"),
-      #     list(
-      #       count = 1,
-      #       label = "1 yr",
-      #       step = "year",
-      #       stepmode = "backward"),
-      #     list(
-      #       count = 1,
-      #       label = "YTD",
-      #       step = "year",
-      #       stepmode = "todate"),
-      #     list(step = "all"))),
+      rangeselector = list(
+        buttons = list(
+          list(
+            count = 3,
+            label = "3 meses",
+            step = "month",
+            stepmode = "backward"),
+          list(
+            count = 6,
+            label = "6 meses",
+            step = "month",
+            stepmode = "backward"),
+          list(
+            count = 1,
+            label = "1 año",
+            step = "year",
+            stepmode = "backward"),
+          list(step = "Todo"))),
       rangeslider = list(type = 'date')
     ),
     yaxis = list(
@@ -256,6 +251,7 @@ trip_events_02 %>%
     ),
     margin = list(
       u = 0
-    )
+    ),
+    barmode = 'stack'
   )
 ```

@@ -13,10 +13,11 @@ library(tidyverse)
 library(forcats)
 library(plotly)
 library(stringr)
+library(magrittr)
 ```
 
 ```{r}
-# getwd() %>% normalizePath() %>% list(PROJ_HOME = .) %>% attach
+sessionInfo()
 ```
 
 ```{r}
@@ -39,7 +40,7 @@ gc(TRUE)
 ### Importamos los datos
 
 ```{r trip}
-trip <- file.path(PROJ_HOME, "data/raw", "trip.csv") %>%
+trip <- file.path(PROJ_HOME, "data/raw", "trip.csv.zip") %>%
   read_csv(
     col_types = cols_only(
       id = col_integer(),
@@ -94,7 +95,7 @@ glimpse(station)
 glimpse(weather)
 ```
 
-```{r}
+```{r station_02}
 station_02 <- station %>%
   mutate(
     zip_code = city %>% recode(
@@ -109,7 +110,10 @@ station_02 <- station %>%
     vars(name, city),
     as.factor
   ) %>%
-  glimpse()
+  glimpse() %T>%
+  saveRDS(
+    file.path(PROJ_HOME, "data/processed", "station_02.Rds")
+  )
 ```
 
 ```{r trip_events}
@@ -139,7 +143,7 @@ trip_events <- trip %>%
   glimpse()
 ```
 
-```{r}
+```{r weather_02}
 weather_02 <- weather %>%
   mutate(
     rain = str_detect(events, regex("rain", ignore_case = TRUE)) %>% coalesce(FALSE),
@@ -147,10 +151,13 @@ weather_02 <- weather %>%
     thunderstorm = str_detect(events, regex("thunderstorm", ignore_case = TRUE)) %>% coalesce(FALSE)
   ) %>%
   select(-events) %>%
-  glimpse()
+  glimpse() %T>%
+  saveRDS(
+    file.path(PROJ_HOME, "data/processed", "weather_02.Rds")
+  )
 ```
 
-```{r}
+```{r trip_events_02}
 meses <- locale("es")[[c("date_names", "mon")]] %>% str_to_title()
 dias <- locale("es")[[c("date_names", "day")]] %>% str_to_title()
 
@@ -198,13 +205,6 @@ trip %>%
     y = rownames(.) %>% fct_inorder,
     z = .,
     type = "heatmap"
-  )
-```
-
-```{r}
-trip_events_02 %>%
-  saveRDS(
-    file.path(PROJ_HOME, "data/processed", "trip_events_02.Rds")
   )
 ```
 
