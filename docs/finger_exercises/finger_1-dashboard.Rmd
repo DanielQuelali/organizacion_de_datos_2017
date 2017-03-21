@@ -101,7 +101,6 @@ trip_events_02 %>%
       y = 1
     )
   )
-export(vwidth = 1200, vheight = 630)
 ```
 
 Column {data-height=300}
@@ -177,6 +176,7 @@ trip_events_02 %>%
     yaxis = list(
       title = NA,
       showgrid = FALSE,
+      #fixedrange = TRUE,
       rangemode = 'tozero'
     ),
     legend = list(
