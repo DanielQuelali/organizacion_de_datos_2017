@@ -4,6 +4,8 @@ output:
   flexdashboard::flex_dashboard:
     orientation: rows
     vertical_layout: fill
+    includes: 
+      in_header: "_open-graph.html"
 ---
 
 ```{r setup, include=FALSE}
@@ -99,6 +101,7 @@ trip_events_02 %>%
       y = 1
     )
   )
+export(vwidth = 1200, vheight = 630)
 ```
 
 Column {data-height=300}
