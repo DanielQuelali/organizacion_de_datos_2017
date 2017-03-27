@@ -1,0 +1,112 @@
+---
+title: "San Francisco Biking - Map"
+output: html_notebook
+editor_options: 
+  chunk_output_type: inline
+---
+
+## Duración de recorridos
+
+Se calculó la mediana de las duraciones de los viajes en bicicleta de cada recorrido.
+<br/>Se descartaron los recorridos que empiezan y terminan en la misma estación
+
+```{r packages, message=FALSE, warning=FALSE}
+library(lubridate)
+library(tidyverse)
+library(forcats)
+library(plotly)
+library(stringr)
+library(magrittr)
+library(leaflet)
+```
+
+```{r}
+trip_paths <- trip %>%
+  #head(50) %>%
+  filter(start_station_id != end_station_id) %>%
+  inner_join(
+    station_02 %>%
+      filter(city == 'San Francisco') %>%
+      select(
+        id,
+        long,
+        lat
+      ),
+    by = c('start_station_id' = 'id')
+  ) %>%
+  inner_join(
+    station_02 %>%
+      filter(city == 'San Francisco') %>%
+      select(
+        id,
+        long,
+        lat
+      ),
+    by = c('end_station_id' = 'id')
+  ) %>%
+  group_by(
+    start_station_id,
+    end_station_id
+  ) %>%
+  summarise(
+    median_duration = median(duration),
+    start_lat = lat.x[[1]],
+    start_lng = long.x[[1]],
+    end_lat = lat.y[[1]],
+    end_lng = long.y[[1]],
+    trips = n()
+  ) %>%
+  ungroup %>%
+  mutate(
+    path_id = row_number()
+  ) %T>%
+  print
+```
+
+```{r}
+rides_lines <- trip_paths %>%
+  #sample_n(10) %>%
+  by_row(
+    function(df) {
+      df %>%
+        gather(
+          key = event,
+          value = station_id,
+          matches("station_id")
+        ) %>%
+        arrange(path_id) %>%
+        mutate(
+          event = event %>% str_extract("[a-z]+") %>% fct_inorder(),
+          lat = if_else(event == "start", start_lat, end_lat),
+          lng = if_else(event == "start", start_lng, end_lng)
+        ) %$% 
+        Lines(Line(cbind(lng, lat)), ID = path_id[[1]])
+    },
+    .to = "lines"
+  ) %>%
+  SpatialLinesDataFrame(SpatialLines(.$lines), data = .)
+```
+
+```{r, fig.width=9, fig.height=9}
+qpal <- colorQuantile("RdYlGn", rides_lines$median_duration, n = 7, reverse = TRUE)
+awesome_icon <- awesomeIcons(
+  icon = 'bicycle',
+  library = 'fa',
+  markerColor = 'orange'
+)
+
+rides_lines %>%
+  leaflet() %>%
+  addProviderTiles(providers$CartoDB.DarkMatterNoLabels) %>%
+  addPolylines(
+    color = ~qpal(median_duration),
+    opacity = 0.2
+  ) %>%
+  addAwesomeMarkers(
+    ~long,
+    ~lat,
+    icon = awesome_icon,
+    popup = ~name,
+    data = station_02 %>% filter(city == 'San Francisco')
+  )
+```
