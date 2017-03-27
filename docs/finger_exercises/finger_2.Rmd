@@ -106,6 +106,7 @@ rides_lines %>%
   addProviderTiles(providers$CartoDB.DarkMatterNoLabels) %>%
   addPolylines(
     color = ~qpal(median_duration),
+    label = ~median_duration %>% seconds_to_period() %>% paste0("Duración: ", .),
     opacity = 0.2
   ) %>%
   addLegend(
