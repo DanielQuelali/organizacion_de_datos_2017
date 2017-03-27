@@ -88,7 +88,13 @@ rides_lines <- trip_paths %>%
 ```
 
 ```{r, fig.width=9, fig.height=9}
-qpal <- colorQuantile("RdYlGn", rides_lines$median_duration, n = 7, reverse = TRUE)
+qpal <- colorQuantile(
+  palette = "RdYlGn",
+  domain = rides_lines$median_duration,
+  n = 7,
+  reverse = TRUE
+)
+
 awesome_icon <- awesomeIcons(
   icon = 'bicycle',
   library = 'fa',
@@ -101,6 +107,16 @@ rides_lines %>%
   addPolylines(
     color = ~qpal(median_duration),
     opacity = 0.2
+  ) %>%
+  addLegend(
+    pal = qpal,
+    values = ~median_duration,
+    title = "Duración (minutos)",
+    opacity = 1,
+    labFormat = function(type, cuts, p) {
+      n = length(cuts)
+      paste0(round(cuts[-n] / 60), " &ndash; ", round(cuts[-1] / 60))
+    }
   ) %>%
   addAwesomeMarkers(
     ~long,
